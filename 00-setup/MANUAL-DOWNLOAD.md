@@ -15,8 +15,8 @@ If `download-model.py` can't reach Hugging Face (university firewall, captive po
    | `Qwen2.5-7B-Instruct` | https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/tree/main |
 
 3. Download two files:
-   - The **Q4_K_M** GGUF (primary)
-   - The **Q2_K** GGUF (for the quantization comparison)
+   - The primary GGUF listed in `download-model.py` for your tier
+   - The smaller comparison GGUF listed in `download-model.py` for your tier
 
 4. Place them under `models/` in the repo root. Any subdirectory layout is fine.
 

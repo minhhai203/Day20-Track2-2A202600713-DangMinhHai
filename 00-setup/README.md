@@ -42,6 +42,7 @@ Set env vars **before** running the setup script:
 | `LLAMA_CUDA=1` | Force a CUDA build (Linux/Windows + NVIDIA) |
 | `LLAMA_VULKAN=1` | Force a Vulkan build (cross-vendor) |
 | `PYTHON=python3.11` | Use a specific Python interpreter (macOS) |
+| `LAB_MODEL=Llama-3.2-3B-Instruct` | Force a specific GGUF tier to download |
 
 ## Manual model download
 

@@ -7,7 +7,7 @@ A 30-minute tour of the deck's vocabulary on your own laptop. You'll measure **T
 By the end of this track you should be able to answer:
 
 1. What's the TTFT and TPOT for *your* laptop on a Q4_K_M model? Where does that put you on the latency taxonomy from §0?
-2. How much does dropping from Q4_K_M to Q2_K save in RAM, and what does it cost you in latency / quality?
+2. How much does dropping from the primary quantization to a smaller comparison quantization save in RAM, and what does it cost you in latency / quality?
 3. What does `n_threads` actually do? (Spoiler: more isn't always faster — physical cores beat logical cores for compute-bound work.)
 
 ## Run
@@ -21,7 +21,7 @@ This loads the primary GGUF model from `models/active.json`, runs:
 
 - A **single-prompt latency** trace (TTFT + TPOT)
 - A **20-request batch** to compute P50 / P95 / P99 over a realistic prompt distribution
-- A **quantization comparison** loading both Q4_K_M and Q2_K, same prompts, side-by-side numbers
+- A **quantization comparison** loading the primary quantization and a smaller comparison quantization, same prompts, side-by-side numbers
 
 Output is printed to stdout and written to `benchmarks/01-quickstart-results.md`.
 
@@ -57,6 +57,6 @@ Edit `benchmark.py` (or pass via env vars) and observe the change:
 ## Deck mapping
 
 - §0 Latency Taxonomy → the TTFT/TPOT/P95 numbers you just measured
-- §1 Quantization → the Q4_K_M vs Q2_K side-by-side
+- §1 Quantization → the primary quantization vs a smaller comparison quantization
 - §2 KV Cache & Attention → `LAB_N_CTX` controls how much KV cache you allocate
 - §3 Production Tuning → `LAB_N_THREADS`, `LAB_N_BATCH`, `LAB_N_GPU_LAYERS` are the knobs

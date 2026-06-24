@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Download the recommended GGUF model for the laptop's RAM tier.
 
-Reads `hardware.json` (produced by detect-hardware.py) and pulls a single
-GGUF file via huggingface_hub. Two quantizations downloaded so 02 and bonus
-tracks have something to compare.
+Reads `hardware.json` (produced by detect-hardware.py) and pulls GGUF files
+via huggingface_hub. Two quantizations are downloaded so 02 and bonus tracks
+have something to compare. A manual model override is supported for cases
+where you want a specific model regardless of the hardware recommendation.
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ except ImportError:
     sys.exit(1)
 
 
-# repo_id, file_q4 (primary), file_compare (smaller for the comparison frame)
+# repo_id, file_primary, file_compare
 TIERS: dict[str, tuple[str, str, str]] = {
     "TinyLlama-1.1B": (
         "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
@@ -34,11 +35,11 @@ TIERS: dict[str, tuple[str, str, str]] = {
     "Llama-3.2-3B-Instruct": (
         "bartowski/Llama-3.2-3B-Instruct-GGUF",
         "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-        "Llama-3.2-3B-Instruct-Q2_K.gguf",
+        "Llama-3.2-3B-Instruct-Q3_K_L.gguf",
     ),
     "Qwen2.5-7B-Instruct": (
         "Qwen/Qwen2.5-7B-Instruct-GGUF",
-        "qwen2.5-7b-instruct-q4_k_m.gguf",
+        "qwen2.5-7b-instruct-q3_k_m.gguf",
         "qwen2.5-7b-instruct-q2_k.gguf",
     ),
 }
@@ -61,6 +62,11 @@ def find_existing(out_dir: Path, filename: str) -> Path | None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download GGUF model for the lab.")
     parser.add_argument(
+        "--model",
+        help="Force a specific model tier (for example Llama-3.2-3B-Instruct). "
+        "Defaults to the tier detected from hardware.json.",
+    )
+    parser.add_argument(
         "--skip-download",
         action="store_true",
         help="Don't fetch — only locate already-downloaded files and write models/active.json",
@@ -73,7 +79,10 @@ def main() -> int:
         return 1
 
     hw = json.loads(hw_path.read_text())
-    tier_key = pick_tier(hw["recommendation"]["recommended_model"])
+    tier_key = args.model or pick_tier(hw["recommendation"]["recommended_model"])
+    if tier_key not in TIERS:
+        print(f"ERROR: unknown model tier {tier_key!r}. Expected one of: {', '.join(TIERS)}", file=sys.stderr)
+        return 1
     repo_id, q4_file, q2_file = TIERS[tier_key]
 
     out_dir = Path("models")

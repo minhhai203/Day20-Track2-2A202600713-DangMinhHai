@@ -1,0 +1,36 @@
+{
+  "primary": {
+    "label": "primary quantization",
+    "model_path": "models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "n_threads": 10,
+    "n_ctx": 2048,
+    "n_batch": 512,
+    "n_gpu_layers": 99,
+    "load_ms": 12818.5,
+    "ttft_ms_p50": 46.1,
+    "ttft_ms_p95": 146.8,
+    "tpot_ms_p50": 11.37,
+    "tpot_ms_p95": 12.02,
+    "e2e_ms_p50": 772.8,
+    "e2e_ms_p95": 852.5,
+    "e2e_ms_p99": 869.4,
+    "decode_rate_tok_s": 87.9
+  },
+  "compare": {
+    "label": "smaller comparison quantization",
+    "model_path": "models/Llama-3.2-3B-Instruct-Q3_K_L.gguf",
+    "n_threads": 10,
+    "n_ctx": 2048,
+    "n_batch": 512,
+    "n_gpu_layers": 99,
+    "load_ms": 1208.8,
+    "ttft_ms_p50": 56.8,
+    "ttft_ms_p95": 140.4,
+    "tpot_ms_p50": 16.05,
+    "tpot_ms_p95": 16.66,
+    "e2e_ms_p50": 1069.0,
+    "e2e_ms_p95": 1137.9,
+    "e2e_ms_p99": 1153.1,
+    "decode_rate_tok_s": 62.3
+  }
+}

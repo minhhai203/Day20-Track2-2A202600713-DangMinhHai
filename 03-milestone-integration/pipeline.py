@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
-"""Skeleton RAG pipeline gluing N19 retrieval + N20 llama-server.
+"""RAG pipeline: vector retrieval + llama-server (N16–N19 integration).
 
-Replace the STUB markers with your actual N18/N19 code. Runs as-is using
-in-memory toy data so you can confirm the OpenAI-compat call before wiring
-in your real lakehouse + vector store.
+Wires a minimal end-to-end flow:
+  N18 (lakehouse) → SQLite doc store
+  N19 (vector)    → in-memory cosine index with numpy embeddings
+  N20 (serving)   → local llama-server OpenAI-compat API
 """
 from __future__ import annotations
 
+import json
+import sqlite3
 import time
 from dataclasses import dataclass
-from typing import Iterable
+from pathlib import Path
 
 import httpx
+import numpy as np
 
+# ── Config (N16–N19 stubs) ───────────────────────────────────────────────
 LLAMA_SERVER_BASE = "http://localhost:8080/v1"
+LAKEHOUSE_DB = Path(__file__).parent / "lakehouse_stub.db"
+VECTOR_DIM = 64
+
 SYSTEM_PROMPT = (
     "You are a serving-engineering tutor. Answer using only the documents provided. "
     "If the documents don't contain the answer, say so."
 )
-
-
-# ────────────────────────────────────────────────────────────────────────
-# Replace this STUB with retrieval against your N19 vector index.
-# ────────────────────────────────────────────────────────────────────────
 
 TOY_DOCS = [
     {"id": "n20-paged", "text": "PagedAttention treats KV cache like virtual memory pages, eliminating 60-80% fragmentation."},
@@ -40,34 +43,78 @@ class Doc:
     score: float
 
 
+# ── N18: Lakehouse stub (SQLite) ───────────────────────────────────────
+
+def init_lakehouse() -> sqlite3.Connection:
+    """N18 stub — SQLite table mimicking a Delta/Iceberg doc table."""
+    conn = sqlite3.connect(LAKEHOUSE_DB)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS docs (id TEXT PRIMARY KEY, text TEXT NOT NULL)"
+    )
+    for d in TOY_DOCS:
+        conn.execute(
+            "INSERT OR REPLACE INTO docs (id, text) VALUES (?, ?)",
+            (d["id"], d["text"]),
+        )
+    conn.commit()
+    return conn
+
+
+# ── N19: Vector index (numpy cosine) ─────────────────────────────────────
+
+def _hash_embed(text: str, dim: int = VECTOR_DIM) -> np.ndarray:
+    """Lightweight deterministic embedder — no extra model download."""
+    rng = np.random.default_rng(abs(hash(text)) % (2**32))
+    v = rng.standard_normal(dim)
+    return v / (np.linalg.norm(v) + 1e-9)
+
+
+class VectorIndex:
+    """N19 stub — in-memory cosine similarity index."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.docs: list[dict] = []
+        self.vectors: list[np.ndarray] = []
+        for row in conn.execute("SELECT id, text FROM docs"):
+            self.docs.append({"id": row[0], "text": row[1]})
+            self.vectors.append(_hash_embed(row[1]))
+
+    def search(self, query_vec: np.ndarray, k: int = 3) -> list[Doc]:
+        scores = [float(np.dot(query_vec, v)) for v in self.vectors]
+        ranked = sorted(
+            zip(self.docs, scores), key=lambda x: x[1], reverse=True
+        )[:k]
+        return [Doc(d["id"], d["text"], s) for d, s in ranked]
+
+
+_INDEX: VectorIndex | None = None
+
+
+def get_index() -> VectorIndex:
+    global _INDEX
+    if _INDEX is None:
+        _INDEX = VectorIndex(init_lakehouse())
+    return _INDEX
+
+
+def embed(query: str) -> np.ndarray:
+    return _hash_embed(query)
+
+
 def retrieve(query: str, k: int = 3) -> list[Doc]:
-    """STUB: replace with your N19 vector index call."""
-    # Toy keyword overlap so the demo does *something* sensible without an embedder.
-    q_terms = {w.lower() for w in query.split() if len(w) > 3}
-    scored = [
-        Doc(d["id"], d["text"], score=len(q_terms & {w.lower() for w in d["text"].split()}))
-        for d in TOY_DOCS
-    ]
-    return sorted(scored, key=lambda d: d.score, reverse=True)[:k]
+    """N19 vector retrieval — embed query, cosine top-K."""
+    return get_index().search(embed(query), k=k)
 
 
-# ────────────────────────────────────────────────────────────────────────
-# Prompt assembly
-# ────────────────────────────────────────────────────────────────────────
+# ── Prompt assembly + N20 llama-server ───────────────────────────────────
 
-
-def build_prompt(query: str, contexts: Iterable[Doc]) -> list[dict]:
+def build_prompt(query: str, contexts: list[Doc]) -> list[dict]:
     ctx_block = "\n".join(f"[{c.id}] {c.text}" for c in contexts)
     user = f"Context:\n{ctx_block}\n\nQuestion: {query}"
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user},
     ]
-
-
-# ────────────────────────────────────────────────────────────────────────
-# llama-server call
-# ────────────────────────────────────────────────────────────────────────
 
 
 def call_llm(messages: list[dict]) -> tuple[str, float]:
@@ -86,19 +133,23 @@ def answer(query: str) -> dict:
     t_total = time.perf_counter()
 
     t = time.perf_counter()
-    docs = retrieve(query, k=3)
+    query_vec = embed(query)
+    t_embed_ms = (time.perf_counter() - t) * 1000.0
+
+    t = time.perf_counter()
+    docs = get_index().search(query_vec, k=3)
     t_retrieve_ms = (time.perf_counter() - t) * 1000.0
 
     messages = build_prompt(query, docs)
-
     text, t_llm_ms = call_llm(messages)
 
     return {
         "query": query,
         "answer": text,
-        "contexts": [{"id": d.id, "score": d.score} for d in docs],
+        "contexts": [{"id": d.id, "score": round(d.score, 3)} for d in docs],
         "timings_ms": {
-            "retrieve": round(t_retrieve_ms, 1),
+            "embed": round(t_embed_ms, 2),
+            "retrieve": round(t_retrieve_ms, 2),
             "llm": round(t_llm_ms, 1),
             "total": round((time.perf_counter() - t_total) * 1000.0, 1),
         },
@@ -106,6 +157,9 @@ def answer(query: str) -> dict:
 
 
 def main() -> None:
+    # Warm up lakehouse + vector index (avoid cold-start skew in timings)
+    get_index()
+
     queries = [
         "Why is goodput more useful than throughput?",
         "What problem does PagedAttention actually solve?",
@@ -115,6 +169,7 @@ def main() -> None:
         print(f"\n=== {q} ===")
         result = answer(q)
         print(f"  contexts: {[c['id'] for c in result['contexts']]}")
+        print(f"  scores  : {[c['score'] for c in result['contexts']]}")
         print(f"  timings : {result['timings_ms']}")
         print(f"  answer  : {result['answer'].strip()[:300]}")
 

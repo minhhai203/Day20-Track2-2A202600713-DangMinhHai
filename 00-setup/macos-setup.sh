@@ -51,7 +51,11 @@ fi
 
 # 6. Probe + download model
 python 00-setup/detect-hardware.py
-python 00-setup/download-model.py
+if [[ -n "${LAB_MODEL:-}" ]]; then
+  python 00-setup/download-model.py --model "$LAB_MODEL"
+else
+  python 00-setup/download-model.py
+fi
 
 echo
 echo "==> Setup complete. Activate with: source .venv/bin/activate"

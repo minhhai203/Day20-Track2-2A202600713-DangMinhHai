@@ -26,7 +26,7 @@ PROMPTS = [
     "Write a haiku about KV cache fragmentation.",
     "What is PagedAttention and why was it a 24x improvement?",
     "List three reasons goodput@SLO matters more than peak throughput.",
-    "Compare Q4_K_M vs Q2_K quantization in three bullets.",
+    "Compare the primary quantization vs the smaller comparison quantization in three bullets.",
     "Why does FlashAttention give O(N) memory instead of O(N^2)?",
     "What's the difference between continuous batching and static batching?",
     "Sketch the steps of speculative decoding.",
@@ -183,7 +183,7 @@ Settings: `n_threads={primary['n_threads']}`, `n_ctx={primary['n_ctx']}`, `n_bat
 
 - TTFT is the prefill cost. With short prompts this is small; with long prompts it dominates.
 - TPOT is per-token decode latency. The decode rate is `1000 / TPOT_p50`.
-- The bigger quantization (Q4_K_M) is usually only ~30–60% slower than Q2_K but produces noticeably better text. Q2_K is for *truly* tight RAM.
+    - The primary quantization is usually only modestly slower than the smaller comparison quantization but produces noticeably better text. The smaller one is for *truly* tight RAM.
 - `n_threads = physical_cores` is usually best on CPU. Hyperthreading (`logical_cores`) often hurts because the work is bandwidth-bound.
 
 (Edit this file with your own observations before submitting.)
@@ -194,8 +194,8 @@ def main() -> int:
     active = load_active()
     hw = load_hardware()
 
-    primary = benchmark_model("primary (Q4_K_M)", active["primary_model"], hw)
-    compare = benchmark_model("compare (Q2_K)", active["compare_model"], hw)
+    primary = benchmark_model("primary quantization", active["primary_model"], hw)
+    compare = benchmark_model("smaller comparison quantization", active["compare_model"], hw)
 
     out_dir = Path("benchmarks")
     out_dir.mkdir(exist_ok=True)

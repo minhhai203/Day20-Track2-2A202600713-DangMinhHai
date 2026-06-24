@@ -41,7 +41,11 @@ echo "==> Probing hardware"
 python 00-setup/detect-hardware.py
 
 # 4. Pull the recommended GGUF model
-python 00-setup/download-model.py
+if [[ -n "${LAB_MODEL:-}" ]]; then
+  python 00-setup/download-model.py --model "$LAB_MODEL"
+else
+  python 00-setup/download-model.py
+fi
 
 echo
 echo "==> Setup complete. Activate with: source .venv/bin/activate"

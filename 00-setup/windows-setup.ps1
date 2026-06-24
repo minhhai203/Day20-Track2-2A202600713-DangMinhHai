@@ -47,7 +47,11 @@ if ($env:LLAMA_CUDA -eq '1') {
 
 # 4. Probe + download model
 python .\00-setup\detect-hardware.py
-python .\00-setup\download-model.py
+if ($env:LAB_MODEL) {
+    python .\00-setup\download-model.py --model $env:LAB_MODEL
+} else {
+    python .\00-setup\download-model.py
+}
 
 Write-Host ""
 Write-Host "==> Setup complete. Activate the venv next time with:" -ForegroundColor Green
